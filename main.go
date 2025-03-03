@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
@@ -15,6 +16,13 @@ type Todo struct {
 	Id        int    `gorm:"primaryKey" json:"id"` // the `json:"id"` this line says that from json input this id Should be mapped to Id like wise others
 	Completed bool   `json:"completed"`
 	Body      string `json:"body"`
+}
+
+type User struct {
+	Id        int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	CreatedAt time.Time
 }
 
 var db *gorm.DB
@@ -33,6 +41,7 @@ func ConnectDB() {
 	}
 	fmt.Println("Connected to the database successfully")
 	db.AutoMigrate(&Todo{})
+	db.AutoMigrate(&User{})
 }
 
 func main() {
@@ -64,6 +73,25 @@ func main() {
 		var todo []Todo
 		db.Find(&todo)
 		return c.Status(200).JSON(fiber.Map{"Todos": todo})
+	})
+	app.Post("/api/createuser", func(c *fiber.Ctx) error {
+		user := &User{}
+		if err := c.BodyParser(user); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err})
+		}
+		if user.Name == "" || user.Email == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Give the name or email"})
+		}
+		result := db.Create(user)
+		if result.Error != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to store in the database"})
+		}
+		return c.Status(200).JSON(fiber.Map{"message": "Added succesfully", "data": user})
+	})
+	app.Get("/api/getusers", func(c *fiber.Ctx) error {
+		var user []User
+		db.Find(&user)
+		return c.Status(200).JSON(fiber.Map{"Todos": user})
 	})
 	log.Fatal(app.Listen(":6969"))
 }
